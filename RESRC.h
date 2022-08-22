@@ -1,11 +1,13 @@
 #ifndef __APP_RES__H__
 #define __APP_RES__H__
 #include <stdio.h>
+#include <stdarg.h>
 #include <pthread.h>
 
 #include "sm3.h"
 #include "FIO/Asfio.h"
 #include "UUID.h"
+#include "coroutine.h"
 
 #define NULL_STAT 0
 #define ONLINE_STAT 1
@@ -25,12 +27,12 @@ extern "C"
     {
         char *path, *mode;
     } FILE_PATH;
-    
+
     /*File的内容*/
     typedef struct _RESRC_FILE
     {
         FILE_PATH path;
-        unsigned char hash[32],UUID[32];
+        unsigned char hash[32], UUID[32];
         bytes data;
         Asfio asp;
         int stat;
@@ -42,31 +44,6 @@ extern "C"
         size_t Number;
         UUID_t uuid_seed;
     } RESRC;
-
-    typedef struct _TIMEOUT
-    {
-        size_t ms;
-        RESRC_FILE *file;
-    } TIMEOUT;
-
-    int RESRC_TIMEOUT(size_t ms, RESRC_FILE *file)
-    {
-#ifdef _WIN32
-        _sleep(ms);
-#else
-    sleep(ms);
-#endif
-        free(file->data.data);
-        file->data.length = 0;
-        file->stat = UNDERLINE_STAT;
-        return UNDERLINE_STAT;
-    }
-
-    int RESRC_init(size_t Thread_queue_MAX)
-    {
-        Thread_queue = (pthread_t *)calloc(Thread_queue_MAX, sizeof(pthread_t));
-        memset(Thread_queue, 0, Thread_queue_MAX);
-    }
     size_t RESRC_create(RESRC *p, size_t _NumOfRESRC)
     {
         (*p).filelist = (RESRC_FILE *)calloc(_NumOfRESRC, sizeof(RESRC_FILE));
@@ -85,13 +62,13 @@ extern "C"
     }
 
     /*file为指向对应RESRC_FILE的指针，并非数组*/
-    int RESRC_FILE_OPEN(UUID_t *p,RESRC_FILE *file, char *filepath, char *mode)
+    int RESRC_FILE_OPEN(UUID_t *p, RESRC_FILE *file, char *filepath, char *mode)
     {
         file->asp = Asfio_create(filepath, mode);
         file->path.path = filepath;
         file->path.mode = mode;
         file->stat = NULL_STAT;
-        UUID(file->UUID,32,p);
+        UUID(file->UUID, 32, p);
         return 0;
     }
     int RESRC_FILE_CLOSE(RESRC_FILE *file)
@@ -99,13 +76,6 @@ extern "C"
         Asfio_close(&file->asp, 0);
         file->stat = CLOSE_STAT;
         return 0;
-    }
-
-    void *func_cache(void *arg)
-    {
-        TIMEOUT *t = (TIMEOUT *)arg;
-        RESRC_TIMEOUT(t->ms,t->file);
-
     }
 
     int RESRC_FILE_cache(size_t timeout, RESRC_FILE *file)
@@ -118,19 +88,14 @@ extern "C"
         {
             if (Asfio_readcall(&(file->asp), &(file->data)) != 0)
             {
-                return file->data.length;
                 file->stat = ONLINE_STAT;
+                return file->data.length;
             }
             else
             {
                 return ERROR_RESRC;
             };
         }
-        pthread_t th;
-        TIMEOUT t;
-        t.ms = timeout;
-        t.file = file;
-        pthread_create(&th, NULL,func_cache,&t);
         return ONLINE_STAT;
     }
 
@@ -145,8 +110,55 @@ extern "C"
             free(file->data.data);
             file->data.length = 0;
             file->stat = FREE_STAT;
-            return file->stat;
+            return FREE_STAT;
         }
+    }
+
+    RESRC_FILE *RESRC_select_path(RESRC *resrc, char *path)
+    {
+        for (size_t i = 0; i < resrc->Number; i++)
+        {
+            if (strcmp(resrc->filelist[i].path.path, path) == 0)
+            {
+                return resrc->filelist + i;
+            }
+        }
+    }
+    RESRC_FILE *RESRC_select_UUID(RESRC *resrc, unsigned char UUID[32])
+    {
+        for (size_t i = 0; i < resrc->Number; i++)
+        {
+            for (size_t i = 0; i < 32; i++)
+            {
+                if ((resrc->filelist[i].UUID[i] ^ UUID[i]))
+                {
+                    break;
+                }
+                else
+                {
+                    return resrc->filelist + i;
+                }
+            }
+        }
+        return NULL;
+    }
+    RESRC_FILE *RESRC_select_hash(RESRC *resrc, unsigned char hash[32])
+    {
+        for (size_t i = 0; i < resrc->Number; i++)
+        {
+            for (size_t i = 0; i < 32; i++)
+            {
+                if ((resrc->filelist[i].hash[i] ^ hash[i]))
+                {
+                    break;
+                }
+                else
+                {
+                    return resrc->filelist + i;
+                }
+            }
+        }
+        return NULL;
     }
 #ifdef __cplusplus
 }
