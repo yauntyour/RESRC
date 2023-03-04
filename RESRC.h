@@ -7,7 +7,6 @@
 #include "sm3.h"
 #include "FIO/Asfio.h"
 #include "UUID.h"
-#include "coroutine.h"
 
 #define NULL_STAT 0
 #define ONLINE_STAT 1
@@ -62,14 +61,14 @@ extern "C"
     }
 
     /*file为指向对应RESRC_FILE的指针，并非数组*/
-    int RESRC_FILE_OPEN(UUID_t *p, RESRC_FILE *file, char *filepath, char *mode)
+    UUID_ptr RESRC_FILE_OPEN(UUID_t *p, RESRC_FILE *file, char *filepath, char *mode)
     {
         file->asp = Asfio_create(filepath, mode);
         file->path.path = filepath;
         file->path.mode = mode;
         file->stat = NULL_STAT;
-        UUID(file->UUID, 32, p);
-        return 0;
+        UUID_NEW(file->UUID, 32, p);
+        return file->UUID;
     }
     int RESRC_FILE_CLOSE(RESRC_FILE *file)
     {
@@ -78,7 +77,7 @@ extern "C"
         return 0;
     }
 
-    int RESRC_FILE_cache(size_t timeout, RESRC_FILE *file)
+    int RESRC_FILE_cache(RESRC_FILE *file)
     {
         if (file->stat == FREE_STAT)
         {
@@ -99,7 +98,7 @@ extern "C"
         return ONLINE_STAT;
     }
 
-    int RESRC_free(RESRC_FILE *file)
+    int RESRC_FILE_free(RESRC_FILE *file)
     {
         if (file->stat == FREE_STAT)
         {
@@ -108,10 +107,20 @@ extern "C"
         else
         {
             free(file->data.data);
+            file->data.length = NULL;
             file->data.length = 0;
             file->stat = FREE_STAT;
             return FREE_STAT;
         }
+    }
+
+    int RESRC_free(RESRC *p)
+    {
+        free(p->filelist);
+        p->filelist = NULL;
+        p->Number = 0;
+        p->uuid_seed = 0;
+        return 0;
     }
 
     RESRC_FILE *RESRC_select_path(RESRC *resrc, char *path)

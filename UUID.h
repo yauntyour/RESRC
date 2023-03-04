@@ -5,7 +5,10 @@
 #include "sm3.h"
 
 typedef long long UUID_t;
+typedef unsigned char* UUID_ptr;
+
 #define BUF_LEN 32 + 24 + 16
+
 char *getTMUTC(char *buf, int len, const char *_Format, time_t *time)
 {
     memset(buf, 0, len);
@@ -26,7 +29,7 @@ char *getTMUTC(char *buf, int len, const char *_Format, time_t *time)
     }
 }
 /*UUID length of 32*/
-int UUID(unsigned char* hash,unsigned int hash_len,UUID_t *time_diff)
+int UUID_NEW(unsigned char* hash,unsigned int hash_len,UUID_t *time_diff)
 {
     char buf[BUF_LEN];
 

@@ -1,3 +1,10 @@
+# RESRC 资源池
+
+集中性管理资源，一次加载在各处调用
+
+基本使用:
+
+```c++
 #include <stdio.h>
 #include "RESRC.h"
 #include "UUID.h"
@@ -47,3 +54,33 @@ int main(int argc, char const *argv[])
     RESRC_free(&res);
     return 0;
 }
+
+ ```
+
+RESRC_FILE的结构:
+
+```c++
+
+    typedef struct _FILE_PATH
+    {
+        char *path, *mode;
+    } FILE_PATH;
+
+    /*File的内容*/
+    typedef struct _RESRC_FILE
+    {
+        FILE_PATH path;
+        unsigned char hash[32], UUID[32];
+        bytes data;
+        Asfio asp;
+        int stat;
+    } RESRC_FILE;
+
+    typedef struct _RESRC
+    {
+        RESRC_FILE *filelist;
+        size_t Number;
+        UUID_t uuid_seed;
+    } RESRC;
+
+```
